@@ -18,7 +18,7 @@
 (defmethod constrain 'constrain-map
   [form]
   (let [{:keys [has allow types]} (apply hash-map (rest form))
-        allow-specified? allow  ;; allow specification of empty sequence
+        allow-specified? allow ;; allow specification of empty sequence
         allow (set allow)
         inferred (keys types)
         has (set has)
@@ -56,6 +56,30 @@
              (list (map-keys) :only (vec (concat has allow)))
              (map-keys))] true
          [{}] false)))))
+
+(defmethod constrain 'constrain-seq
+  [form]
+  (let [{:keys [count min-count every? some]} (apply hash-map (rest form))
+        _ (when (and count min-count)
+            (throw (Exception. "Can not specify count and min-count")))
+        [every?-fn some-fn count-fn min-count-fn] (repeatedly 4 gensym)
+        fns {every?-fn (when every? `(fn [~'s] (every? ~every? ~'s)))
+             some-fn (when some `(fn [~'s] (some ~some ~'s)))
+             count-fn (when count `(fn [~'s] (= ~count (count ~'s))))
+             min-count-fn (when min-count
+                            `(fn [~'s] (>= (count ~'s) ~min-count)))}
+        fns (into {} (filter val fns))]
+    `(fn [data#]
+       (and
+        (and (or (seq? data#) (sequential? data#)))
+        (let [~@(mapcat identity fns)]
+          (match/match
+           [data#]
+           [~(if (or every? some count min-count)
+               `((:or ([] :seq) ([_# & __#] :seq))
+                 :when [~@(keys fns)])
+               `(:or ([] :seq) ([_# & __#] :seq)))]
+           true))))))
 
 (defmacro constrain-pred-fn
   "Generate a constraint checking function.

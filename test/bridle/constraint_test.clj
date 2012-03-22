@@ -49,6 +49,10 @@
 (defconstraint p1 (constrain-map :allow [:a :b]))
 (defconstraint p2 (constrain-map :has [:a :b]))
 
+(defconstraint v0 (constrain-seq))
+(defconstraint v1 (constrain-seq :count 1))
+(defconstraint v2 (constrain-seq :min-count 1))
+
 (defmacro fails
   [expr msg]
   `(let [a# (atom nil)]
@@ -64,4 +68,15 @@
     (is (p2 {:a 1 :b 2 :c 3}) "succeed for extra keys")
     (fails (p0 1) "fail for arbitrary data")
     (fails (p1 {:c 1}) "fail for extra key")
-    (fails (p2 {:a 1}) "fail for missing key")))
+    (fails (p2 {:a 1}) "fail for missing key"))
+  (testing "seqs"
+    (is (v0 []))
+    (is (v0 [1]))
+    (is (v0 [1 2]))
+    (is (v1 [1]))
+    (is (v2 [1]))
+    (is (v2 [1 2]))
+    (fails (v0 {}) "fail for map")
+    (fails (v1 []) "fail for no elements")
+    (fails (v1 [1 2]) "fail for too many elements")
+    (fails (v2 []) "fail for no elements")))

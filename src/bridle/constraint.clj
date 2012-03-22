@@ -30,18 +30,21 @@ If supplied, metadata can include :name and :doc."
         allow (set allow)
         inferred (keys types)
         has (set has)
+        type-fn-syms (zipmap (keys types) (map (fn [_] (gensym)) (keys types)))
+        type-fns (into {} (map
+                           (fn [[k f]] [(type-fn-syms k) `(fn [x#] (~f x#))])
+                           types))
         map-keys (fn []
                    (into {}
                          (map
                           (fn possibly-guarded [k]
-                            (let [t (get types k)]
+                            (let [t (get type-fn-syms k)]
                               (vector
                                k
                                (list
                                 '_
                                 :when
-                                (let [t (or t [])
-                                      t (if (sequential? t) t [t])]
+                                (let [t (or (and t [t]) [])]
                                   (vec
                                    (concat
                                     (if (has k) [`key-found?])
@@ -99,7 +102,8 @@ If supplied, metadata can include :name and :doc."
               (throw+ (merge
                        (~'base-map :type)
                        {:actual-type (type data#)})))
-          (let [~err-fn-sym ~err-fn]
+          (let [~@(mapcat identity type-fns)
+                ~err-fn-sym ~err-fn]
             (match/match
              [data#]
              [~(if allow-specified?
